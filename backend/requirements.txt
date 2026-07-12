@@ -9,3 +9,8 @@ sqlalchemy>=2.0.0
 psycopg[binary]
 alembic
 pydantic-settings
+passlib[bcrypt]
+python-jose[cryptography]
+email-validator
+beautifulsoup4
+reportlab

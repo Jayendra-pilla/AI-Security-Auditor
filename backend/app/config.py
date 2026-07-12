@@ -19,12 +19,20 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # Security
-    JWT_SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10
+    ALLOW_PRIVATE_SCANS: bool = False
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Gemini API
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Observability
+    LOG_LEVEL: str = "INFO"
+    APP_VERSION: str = "1.0.0"
+    ENABLE_REQUEST_LOGGING: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

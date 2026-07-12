@@ -1,48 +1,80 @@
-from fastapi import APIRouter, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+
+from app.database.db import get_db
+from app.schemas.auth import UserRegister, Token
+from app.schemas.user import UserResponse
+from app.services.auth_service import AuthService
+from app.auth.dependencies import get_current_user
+from app.models.user import User
+
+from app.observability.rate_limiter import RateLimiter
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
 
-class UserRegister(BaseModel):
-    email: str
-    username: str
-    password: str
+limiter_auth = RateLimiter(requests_limit=5, window_seconds=60)
 
-class UserLogin(BaseModel):
-    username_or_email: str
-    password: str
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    username: str
-    is_active: bool
-
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserRegister):
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(limiter_auth)])
+def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """
-    Placeholder endpoint to register a new user.
+    Register a new user after validating email, username, and password strength.
     """
-    return {
-        "id": 1,
-        "email": user_data.email,
-        "username": user_data.username,
-        "is_active": True
-    }
+    # Reject duplicate username
+    if AuthService.get_user_by_username(db, user_data.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already registered"
+        )
+        
+    # Reject duplicate email
+    if AuthService.get_user_by_email(db, user_data.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+        
+    user = AuthService.register_user(db, user_data)
+    return user
 
-@router.post("/login", response_model=TokenResponse)
-def login(login_data: UserLogin):
+@router.post("/login", response_model=Token, dependencies=[Depends(limiter_auth)])
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     """
-    Placeholder endpoint to log in a user and return a JWT access token.
+    Authenticate a user via username/email and password.
+    Supports standard URL-encoded Form data (used by OAuth2 / Swagger UI).
     """
-    return {
-        "access_token": "placeholder_jwt_token_here",
-        "token_type": "bearer"
-    }
+    user = AuthService.authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user. Please contact support."
+        )
+        
+    # Update last login time
+    AuthService.update_last_login(db, user)
+    
+    access_token = AuthService.create_access_token(user)
+    return Token(
+        access_token=access_token,
+        token_type="bearer"
+    )
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    """
+    Get the currently authenticated user's profile details.
+    """
+    return current_user

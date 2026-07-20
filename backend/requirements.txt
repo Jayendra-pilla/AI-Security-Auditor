@@ -13,4 +13,5 @@ passlib[bcrypt]
 python-jose[cryptography]
 email-validator
 beautifulsoup4
-reportlab
+reportlab
+tldextract

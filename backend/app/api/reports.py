@@ -177,13 +177,14 @@ def get_report(
 @router.get("/report/{scan_id}/html")
 def get_report_html(
     scan_id: str,
+    mode: str = "technical",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Download/view the security report as a styled HTML page.
     """
-    html_content = ReportExportService.export_html(db, scan_id, current_user)
+    html_content = ReportExportService.export_html(db, scan_id, current_user, mode)
     return Response(
         content=html_content,
         media_type="text/html",
@@ -194,13 +195,14 @@ def get_report_html(
 @router.get("/report/{scan_id}/pdf")
 def get_report_pdf(
     scan_id: str,
+    mode: str = "technical",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Download the security report as a printable PDF.
     """
-    pdf_bytes = ReportExportService.export_pdf(db, scan_id, current_user)
+    pdf_bytes = ReportExportService.export_pdf(db, scan_id, current_user, mode)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -211,13 +213,14 @@ def get_report_pdf(
 @router.get("/report/{scan_id}/markdown")
 def get_report_markdown(
     scan_id: str,
+    mode: str = "technical",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Download the security report as a technical GitHub Markdown file.
     """
-    markdown_content = ReportExportService.export_markdown(db, scan_id, current_user)
+    markdown_content = ReportExportService.export_markdown(db, scan_id, current_user, mode)
     return Response(
         content=markdown_content,
         media_type="text/markdown",
@@ -228,13 +231,14 @@ def get_report_markdown(
 @router.get("/report/{scan_id}/json")
 def get_report_json(
     scan_id: str,
+    mode: str = "technical",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Download the complete security report data as a structured JSON file.
     """
-    json_str = ReportExportService.export_json(db, scan_id, current_user)
+    json_str = ReportExportService.export_json(db, scan_id, current_user, mode)
     return Response(
         content=json_str,
         media_type="application/json",

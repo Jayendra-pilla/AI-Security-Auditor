@@ -40,6 +40,13 @@ class Orchestrator:
         """
         logger.info("Orchestrator analysis started.")
 
+        # Apply cross-scanner correlation (Phase 6 requirement)
+        try:
+            from app.scanners.correlation_engine import correlate_findings
+            results = correlate_findings(results)
+        except Exception as corr_err:
+            logger.error(f"Orchestrator: Correlation step failed: {str(corr_err)}")
+
         agent_reports: Dict[str, Any] = {}
         overall_severity = "Informational"
         total_findings = 0

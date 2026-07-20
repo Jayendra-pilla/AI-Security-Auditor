@@ -12,6 +12,7 @@ from app.reports.json_export import JSONExportGenerator
 class ReportExportService:
     """
     Service layer coordinating professional report formatting and exports.
+    Supports both 'technical' and 'executive' modes.
     """
 
     @staticmethod
@@ -42,33 +43,33 @@ class ReportExportService:
         return scan, report
 
     @classmethod
-    def export_html(cls, db: Session, scan_id: str, current_user: User) -> str:
+    def export_html(cls, db: Session, scan_id: str, current_user: User, mode: str = "technical") -> str:
         """
         Verifies ownership and compiles report as an HTML document.
         """
         scan, report = cls._get_verified_scan_and_report(db, scan_id, current_user)
-        return HTMLReportGenerator.generate(scan, report)
+        return HTMLReportGenerator.generate(scan, report, mode)
 
     @classmethod
-    def export_pdf(cls, db: Session, scan_id: str, current_user: User) -> bytes:
+    def export_pdf(cls, db: Session, scan_id: str, current_user: User, mode: str = "technical") -> bytes:
         """
         Verifies ownership and compiles report as a ReportLab PDF document.
         """
         scan, report = cls._get_verified_scan_and_report(db, scan_id, current_user)
-        return PDFReportGenerator.generate(scan, report)
+        return PDFReportGenerator.generate(scan, report, mode)
 
     @classmethod
-    def export_markdown(cls, db: Session, scan_id: str, current_user: User) -> str:
+    def export_markdown(cls, db: Session, scan_id: str, current_user: User, mode: str = "technical") -> str:
         """
         Verifies ownership and compiles report as a technical GitHub Markdown document.
         """
         scan, report = cls._get_verified_scan_and_report(db, scan_id, current_user)
-        return MarkdownReportGenerator.generate(scan, report)
+        return MarkdownReportGenerator.generate(scan, report, mode)
 
     @classmethod
-    def export_json(cls, db: Session, scan_id: str, current_user: User) -> str:
+    def export_json(cls, db: Session, scan_id: str, current_user: User, mode: str = "technical") -> str:
         """
         Verifies ownership and compiles report as structured JSON content.
         """
         scan, report = cls._get_verified_scan_and_report(db, scan_id, current_user)
-        return JSONExportGenerator.generate(scan, report)
+        return JSONExportGenerator.generate(scan, report, mode)

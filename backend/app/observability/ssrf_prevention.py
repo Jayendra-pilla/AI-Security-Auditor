@@ -9,6 +9,7 @@ Provides:
 import ipaddress
 import socket
 import threading
+import time
 from contextlib import contextmanager
 from urllib.parse import urlparse, urljoin
 from typing import Dict, Any, Optional
@@ -182,9 +183,23 @@ class SafeHTTPClient:
             # Verify and resolve host IP
             safe_ip = resolve_and_verify_ip(host)
 
+            resp = None
             # Pin host to the resolved safe IP thread-locally during this call
             with pin_dns(host, safe_ip):
-                resp = self.client.request(method, current_url, **kwargs)
+                max_retries = 2
+                backoff = 0.5
+                for attempt in range(max_retries):
+                    try:
+                        resp = self.client.request(method, current_url, **kwargs)
+                        break
+                    except (httpx.TimeoutException, httpx.NetworkError) as e:
+                        if attempt == max_retries - 1:
+                            raise e
+                        time.sleep(backoff)
+                        backoff *= 2
+
+            if resp is None:
+                raise RuntimeError("Request failed: No response object was created.")
 
             # Check for redirect status codes
             if resp.status_code in (301, 302, 303, 307, 308):

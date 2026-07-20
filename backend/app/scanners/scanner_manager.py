@@ -71,6 +71,22 @@ class ScannerManager:
 
         for scanner_class in self.scanners:
             scanner_name = scanner_class.__name__
+            
+            # Check technology-aware skip conditions (Phase 5 requirement)
+            try:
+                from app.scanners.scanner_utils import should_skip_scanner
+                if should_skip_scanner(target, scanner_name):
+                    logger.info(f"ScannerManager: Skipping technology-incompatible scanner: {scanner_name}")
+                    results.append({
+                        "scanner": scanner_name,
+                        "status": "success",
+                        "findings": [],
+                        "duration_ms": 0
+                    })
+                    continue
+            except Exception as tech_err:
+                logger.debug(f"Technology skip check failed for {scanner_name}: {str(tech_err)}")
+
             logger.info(f"Starting scanner: {scanner_name}")
             
             try:

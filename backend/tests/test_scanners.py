@@ -156,3 +156,101 @@ def test_scanner_manager_default_placeholder_behavior():
         assert "findings" in res
         assert "duration_ms" in res
         assert "status" in res
+
+
+def test_root_domain_extraction():
+    """Verify extract_root_domain correctly handles subdomains and complex TLDs."""
+    from app.scanners.scanner_utils import extract_root_domain
+    assert extract_root_domain("www.youtube.com") == "youtube.com"
+    assert extract_root_domain("https://blog.example.co.uk/path") == "example.co.uk"
+    assert extract_root_domain("sub.domain.service.gov.in") == "service.gov.in"
+    assert extract_root_domain("example.com") == "example.com"
+
+
+def test_api_endpoint_scanner_signatures():
+    """Verify Swagger/OpenAPI and GraphQL signature validators reject generic pages."""
+    from app.scanners.api_endpoint_scanner import _validate_swagger, _validate_graphql
+    
+    # Valid Swagger page
+    swagger_body = "<html><link href='swagger-ui.css'><script src='swagger-ui-bundle.js'></script></html>"
+    assert _validate_swagger(swagger_body, "text/html") >= 2
+
+    # Clean non-swagger page
+    clean_body = "<html><title>Home Page</title><body>Welcome!</body></html>"
+    assert _validate_swagger(clean_body, "text/html") == 0
+
+    # Valid GraphQL / GraphiQL page
+    graphql_body = "<html><title>GraphiQL</title><body>__schema</body></html>"
+    assert _validate_graphql(graphql_body, "text/html") >= 2
+
+
+def test_confidence_engine():
+    """Verify confidence engine correctly scores and groups results."""
+    from app.scanners.confidence_engine import calculate_confidence, confidence_for_header_finding
+    
+    # High confidence test (needs score >= 0.80)
+    high_conf = calculate_confidence(
+        ["Header Validation", "Content Validation", "Payload Reflection", "Certificate Validation"],
+        "high"
+    )
+    assert high_conf["confidence"] == "High"
+    assert high_conf["score"] >= 0.80
+
+    # Low confidence test
+    low_conf = calculate_confidence(["DNS Validation"], "low")
+    assert low_conf["confidence"] == "Low"
+
+
+def test_deduplication():
+    """Verify deduplication merging by scanner name + title and highest severity/confidence."""
+    from app.scanners.deduplication import deduplicate_findings, deduplicate_recommendations
+    
+    findings = [
+        {
+            "scanner_name": "HeaderScanner",
+            "title": "Missing CSP",
+            "severity": "Low",
+            "confidence": "Low",
+            "evidence": "First evidence",
+        },
+        {
+            "scanner_name": "HeaderScanner",
+            "title": "Missing CSP",
+            "severity": "Medium",
+            "confidence": "High",
+            "evidence": "Second evidence",
+        }
+    ]
+    
+    deduped = deduplicate_findings(findings)
+    assert len(deduped) == 1
+    assert deduped[0]["severity"] == "Medium"
+    assert deduped[0]["confidence"] == "High"
+    assert "First evidence" in deduped[0]["evidence"]
+    assert "Second evidence" in deduped[0]["evidence"]
+
+    # Recommendations deduplication
+    recs = ["Fix CSP", "Fix HSTS", "Fix CSP", "  fix csp  "]
+    deduped_recs = deduplicate_recommendations(recs)
+    assert len(deduped_recs) == 2
+    assert deduped_recs == ["Fix CSP", "Fix HSTS"]
+
+
+def test_cvss_and_mitre_mapping():
+    """Verify CVSS vector retrieval and MITRE ATT&CK technique mapping."""
+    from app.scanners.scanner_utils import get_cvss, get_mitre_mapping
+    
+    # 1. Check valid mapping
+    xss_cvss = get_cvss("reflected_xss")
+    assert xss_cvss["base_score"] == 6.1
+    assert "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N" in xss_cvss["vector"]
+
+    # 2. Check no vector for technology/dns info
+    tech_cvss = get_cvss("tech_disclosure")
+    assert not tech_cvss
+
+    # 3. Check MITRE technique mapping
+    xss_mitre = get_mitre_mapping("xss")
+    assert xss_mitre["technique_id"] == "T1189"
+    assert xss_mitre["attack_stage"] == "Initial Access"
+
